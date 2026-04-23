@@ -1,0 +1,77 @@
+{
+  "hybrid": {
+    "sheet_sources": [
+      {
+        "name": "faq_hybrid",
+        "enabled": true,
+        "file_name": "faq.xlsx",
+        "sheet_name": null,
+        "transformer": "faq_hybrid",
+        "language": "fr",
+        "outputs": {
+          "business_file": "faq_structured.json",
+          "rag_file": "faq_documents.json",
+          "quality_file": "faq_rejected_rows.json",
+          "stats_file": "faq_stats.json"
+        },
+        "indexing_enabled": true
+      }
+    ]
+  },
+  "rag": {
+    "document_sources": [
+      {
+        "name": "google_drive_docs_rag",
+        "enabled": true,
+        "directory": "google_drive_docs",
+        "extensions": [".txt", ".docx", ".pdf"],
+        "exclude_prefixes": ["~$"],
+        "transformer": "document",
+        "language": "fr",
+        "default_source_type": "document",
+        "default_category": "general",
+        "chunking": {
+          "chunk_size": 800,
+          "chunk_overlap": 100
+        },
+        "output_file": "transformed_documents.json",
+        "indexing_enabled": true
+      }
+    ]
+  },
+  "business": {
+    "sheet_sources": [
+      {
+        "name": "formules_tarifs",
+        "enabled": true,
+        "file_name": "formules_tarifs.xlsx",
+        "sheet_name": null,
+        "transformer": "formules_tarifs",
+        "output_file": "formules_tarifs.json"
+      },
+      {
+        "name": "niveaux_mapping",
+        "enabled": true,
+        "file_name": "niveaux.xlsx",
+        "sheet_name": null,
+        "transformer": "niveaux_mapping",
+        "output_file": "cycles_niveaux.json"
+      }
+    ],
+    "document_sources": [
+      {
+        "name": "cycles_niveaux_doc",
+        "enabled": true,
+        "file_name": "niveaux.docx",
+        "transformer": "cycles_niveaux_doc"
+      }
+    ]
+  },
+"indexing": {
+  "enabled": true,
+  "input_files": [
+    "transformed_documents.json",
+    "faq_documents.json"
+  ]
+}
+}
