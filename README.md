@@ -217,8 +217,8 @@ Ex Java / PL-SQL Engineer
 
 ---
 
-## 📬 Contact
-
+## 📬 Contact : 
+linkedin: https://www.linkedin.com/in/marwa-el-allouchi-483a83114
 Disponible pour opportunités en :
 
 * Data Engineering
