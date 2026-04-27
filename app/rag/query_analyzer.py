@@ -13,61 +13,35 @@ class QueryAnalyzer:
     """
 
     TARIF_KEYWORDS = {
-        "tarif",
-        "tarifs",
-        "prix",
-        "cout",
-        "coût",
-        "combien",
-        "formule",
-        "formules",
+        "tarif", "tarifs", "prix", "cout", "coût", "combien",
+        "formule", "formules",
     }
 
     NIVEAU_KEYWORDS = {
-        "niveau",
-        "niveaux",
-        "classe",
-        "âge",
-        "age",
-        "année",
-        "annee",
-        "né",
-        "nee",
-        "nés",
-        "nees",
-        "cycle",
-        "cycles",
+        "niveau", "niveaux", "classe", "âge", "age", "année", "annee",
+        "né", "nee", "nés", "nees", "cycle", "cycles",
     }
 
     INSCRIPTION_KEYWORDS = {
-        "inscription",
-        "inscrire",
-        "s'inscrire",
-        "dossier",
-        "documents",
-        "myscol",
-        "secrétariat",
-        "secretariat",
-        "admission",
-        "payer",
-        "paiement",
-        "plusieurs fois",
-        "virement",
-        "chèque",
-        "cheque",
-        "espèces",
-        "especes",
+        "inscription", "inscrire", "s'inscrire", "dossier", "documents",
+        "myscol", "secrétariat", "secretariat", "admission",
+        "payer", "paiement", "plusieurs fois", "virement",
+        "chèque", "cheque", "espèces", "especes",
+    }
+
+    REGLEMENT_COMPORTEMENT_KEYWORDS = {
+        "câlin", "calin", "bisou", "embrasser", "baiser", "toucher",
+        "geste", "gestes", "comportement", "respect", "irrespect",
+        "insulte", "violence", "dispute", "bagarre",
+        "harcelement", "harcèlement",
+        "autorisé", "autorise", "interdit", "permission",
+        "sortie", "sortir", "recuperer", "récupérer",
+        "absence", "absences", "retard",
+        "sécurité", "securite", "surveillance",
     }
 
     SALUTATION_KEYWORDS = {
-        "bonjour",
-        "salut",
-        "coucou",
-        "hello",
-        "bonsoir",
-        "cc",
-        "slt",
-        "hi",
+        "bonjour", "salut", "coucou", "hello", "bonsoir", "cc", "slt", "hi",
     }
 
     LEVEL_PATTERNS = [
@@ -88,9 +62,6 @@ class QueryAnalyzer:
 
     @staticmethod
     def normalize_question(question: str) -> str:
-        """
-        Normalise légèrement une question utilisateur.
-        """
         if not isinstance(question, str):
             return ""
 
@@ -100,9 +71,6 @@ class QueryAnalyzer:
 
     @staticmethod
     def clean_for_keywords(question: str) -> str:
-        """
-        Nettoie une question pour les recherches par mots-clés.
-        """
         q = QueryAnalyzer.normalize_question(question)
         q = re.sub(r"[?!.,;:()\"'\-]+", " ", q)
         q = re.sub(r"\s+", " ", q).strip()
@@ -110,9 +78,6 @@ class QueryAnalyzer:
 
     @staticmethod
     def _contains_any_keyword(question: str, keywords: set[str]) -> bool:
-        """
-        Détecte si au moins un mot-clé est présent dans la question nettoyée.
-        """
         cleaned = QueryAnalyzer.clean_for_keywords(question)
         words = set(cleaned.split())
 
@@ -156,19 +121,19 @@ class QueryAnalyzer:
         )
 
     @staticmethod
+    def contains_reglement_comportement_pattern(question: str) -> bool:
+        return QueryAnalyzer._contains_any_keyword(
+            question,
+            QueryAnalyzer.REGLEMENT_COMPORTEMENT_KEYWORDS,
+        )
+
+    @staticmethod
     def is_greeting(question: str) -> bool:
-        """
-        Helper léger conservé, même si le small talk principal
-        est désormais géré par SmallTalkDetector.
-        """
         q = QueryAnalyzer.normalize_question(question)
         return any(q.startswith(word) for word in QueryAnalyzer.SALUTATION_KEYWORDS)
 
     @staticmethod
     def strip_greeting(question: str) -> str:
-        """
-        Helper conservé pour compatibilité éventuelle.
-        """
         q = question.strip()
 
         greeting_patterns = [
@@ -187,13 +152,11 @@ class QueryAnalyzer:
             QueryAnalyzer.TARIF_KEYWORDS
             | QueryAnalyzer.NIVEAU_KEYWORDS
             | QueryAnalyzer.INSCRIPTION_KEYWORDS
+            | QueryAnalyzer.REGLEMENT_COMPORTEMENT_KEYWORDS
         )
 
     @staticmethod
     def is_short_ambiguous_question(question: str) -> bool:
-        """
-        Détecte les questions très courtes ou ambiguës.
-        """
         cleaned = QueryAnalyzer.clean_for_keywords(question)
         if not cleaned:
             return True
@@ -210,9 +173,6 @@ class QueryAnalyzer:
 
     @staticmethod
     def is_valid_question(question: str) -> bool:
-        """
-        Vérifie si une question semble exploitable.
-        """
         q = QueryAnalyzer.normalize_question(question)
 
         if not q:
@@ -236,6 +196,9 @@ class QueryAnalyzer:
         if QueryAnalyzer.contains_niveau_pattern(q):
             return True
 
+        if QueryAnalyzer.contains_reglement_comportement_pattern(q):
+            return True
+
         return False
 
     @staticmethod
@@ -245,6 +208,7 @@ class QueryAnalyzer:
         - tarif
         - niveau
         - inscription
+        - reglement
         - general
         """
         q = QueryAnalyzer.normalize_question(question)
@@ -256,6 +220,10 @@ class QueryAnalyzer:
         if QueryAnalyzer.contains_inscription_pattern(q):
             logger.info("Intention détectée : inscription")
             return "inscription"
+
+        if QueryAnalyzer.contains_reglement_comportement_pattern(q):
+            logger.info("Intention détectée : reglement")
+            return "reglement"
 
         if QueryAnalyzer.contains_tarif_pattern(q):
             logger.info("Intention détectée : tarif")
