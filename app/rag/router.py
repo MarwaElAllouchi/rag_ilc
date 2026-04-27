@@ -250,6 +250,22 @@ class RagRouter:
             intent="inscription",
             route="inscription_hybrid",
         )
+    
+    def _handle_reglement(self, question: str, top_k: int) -> dict[str, Any]:
+        logger.info("Router → mode RAG REGLEMENT")
+
+        result = self.pipeline.run(
+            user_question=question,
+            top_k=top_k,
+            intent="reglement",
+        )
+
+        return self._build_response(
+            answer=result["answer"],
+            documents=result.get("documents", []),
+            intent="reglement",
+            route="reglement_rag",
+        )
 
     def _handle_general(self, question: str, top_k: int) -> dict[str, Any]:
         logger.info("Router → mode RAG GENERAL")
