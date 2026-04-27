@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from app.core.config import get_settings
@@ -95,6 +96,8 @@ class RagPipeline:
         intent: str | None = None,
     ) -> dict[str, Any]:
 
+        pipeline_start_time = time.time()
+
         cleaned_question = self._clean_question(user_question)
 
         if not cleaned_question:
@@ -107,25 +110,44 @@ class RagPipeline:
 
         effective_intent = intent or QueryAnalyzer.detect_intent(cleaned_question)
 
+        retrieval_start_time = time.time()
         try:
             documents = self.retriever.retrieve(
                 query=cleaned_question,
                 top_k=top_k or self.settings.top_k,
             )
         except EmbeddingServiceUnavailableError:
+            logger.info(
+                "⏱ Pipeline stopped during retrieval after %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer="Le service de recherche est indisponible.",
                 intent=effective_intent,
             )
         except Exception:
             logger.exception("Erreur retrieval")
+            logger.info(
+                "⏱ Pipeline stopped during retrieval after %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer="Une erreur technique est survenue.",
                 intent=effective_intent,
             )
 
+        retrieval_end_time = time.time()
+        logger.info(
+            "⏱ Retrieval time: %.3f sec",
+            retrieval_end_time - retrieval_start_time,
+        )
+
         # ❌ aucun document
         if not documents:
+            logger.info(
+                "⏱ Total pipeline time: %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer=self._build_no_document_answer(effective_intent),
                 intent=effective_intent,
@@ -139,6 +161,10 @@ class RagPipeline:
 
         if best_distance > threshold:
             logger.warning("Fallback : documents non pertinents")
+            logger.info(
+                "⏱ Total pipeline time: %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer="Je n’ai pas cette information pour le moment.",
                 intent=effective_intent,
@@ -150,6 +176,10 @@ class RagPipeline:
                 documents[0].get("content", "")
             )
             if faq_answer:
+                logger.info(
+                    "⏱ Total pipeline time: %.3f sec",
+                    time.time() - pipeline_start_time,
+                )
                 return self._build_response(
                     answer=faq_answer,
                     documents=[documents[0]],
@@ -159,14 +189,29 @@ class RagPipeline:
         # 🧠 génération
         context_docs = documents[:5]
 
+        prompt_start_time = time.time()
         messages = PromptBuilder.build_prompt(
             user_question=cleaned_question,
             documents=context_docs,
         )
+        prompt_end_time = time.time()
+        logger.info(
+            "⏱ Prompt build time: %.3f sec",
+            prompt_end_time - prompt_start_time,
+        )
 
+        generation_start_time = time.time()
         try:
             answer = self.generator.generate(messages)
         except GenerationServiceUnavailableError:
+            logger.info(
+                "⏱ Generation time before failure: %.3f sec",
+                time.time() - generation_start_time,
+            )
+            logger.info(
+                "⏱ Total pipeline time: %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer="Le service de réponse est indisponible.",
                 documents=context_docs,
@@ -174,11 +219,29 @@ class RagPipeline:
             )
         except Exception:
             logger.exception("Erreur génération")
+            logger.info(
+                "⏱ Generation time before failure: %.3f sec",
+                time.time() - generation_start_time,
+            )
+            logger.info(
+                "⏱ Total pipeline time: %.3f sec",
+                time.time() - pipeline_start_time,
+            )
             return self._build_response(
                 answer="Une erreur est survenue lors de la réponse.",
                 documents=context_docs,
                 intent=effective_intent,
             )
+
+        generation_end_time = time.time()
+        logger.info(
+            "⏱ Generation time: %.3f sec",
+            generation_end_time - generation_start_time,
+        )
+        logger.info(
+            "⏱ Total pipeline time: %.3f sec",
+            generation_end_time - pipeline_start_time,
+        )
 
         return self._build_response(
             answer=answer,
