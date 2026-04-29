@@ -5,7 +5,7 @@ services:
     build: .
     container_name: rag_app
     ports:
-      - "8001:8000"
+      - "${APP_HOST}:${HOST_APP_PORT}:${APP_PORT}"
     depends_on:
       - db
     env_file:
@@ -23,11 +23,11 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "5432:5432"
+    expose:
+      - "${DB_PORT}"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d 
+      - ./db/init:/docker-entrypoint-initdb.d
     restart: always
 
 volumes:
