@@ -25,7 +25,7 @@ class RagPipeline:
     - anti-hallucination (seuil)
     - fallback sécurisé
     - FAQ shortcut
-    - support intention reglement (NEW)
+    - routing par intention métier
     """
 
     def __init__(self) -> None:
@@ -67,6 +67,24 @@ class RagPipeline:
         return content.split(marker, 1)[1].strip() or None
 
     @staticmethod
+    def _get_document_distance(document: dict[str, Any]) -> float:
+        """
+        Retourne la meilleure distance disponible :
+        - adjusted_distance si elle existe
+        - sinon distance brute
+        - sinon 999.0
+        """
+        adjusted_distance = document.get("adjusted_distance")
+        if adjusted_distance is not None:
+            return float(adjusted_distance)
+
+        distance = document.get("distance")
+        if distance is not None:
+            return float(distance)
+
+        return 999.0
+
+    @staticmethod
     def _should_short_circuit_with_faq(documents: list[dict[str, Any]]) -> bool:
         if not documents:
             return False
@@ -77,7 +95,7 @@ class RagPipeline:
         if str(metadata.get("source_type", "")).lower() != "faq":
             return False
 
-        top1_dist = float(top1.get("adjusted_distance") or 999.0)
+        top1_dist = RagPipeline._get_document_distance(top1)
 
         if top1_dist > 0.20:
             return False
@@ -85,7 +103,7 @@ class RagPipeline:
         if len(documents) == 1:
             return True
 
-        top2_dist = float(documents[1].get("adjusted_distance") or 999.0)
+        top2_dist = RagPipeline._get_document_distance(documents[1])
 
         return (top2_dist - top1_dist) >= 0.08
 
@@ -108,8 +126,14 @@ class RagPipeline:
 
         effective_intent = intent or QueryAnalyzer.detect_intent(cleaned_question)
 
-        # 🔥 NEW : routing intelligent reglement
-        categories = ["reglement"] if effective_intent == "reglement" else None
+        categories_by_intent = {
+            "niveau": ["niveau"],
+            "inscription": ["inscription", "paiement", "reglement"],
+            "tarif": ["tarif", "paiement"],
+            "reglement": ["reglement"],
+        }
+
+        categories = categories_by_intent.get(effective_intent)
 
         logger.info(
             "Pipeline RAG | question='%s' | intent=%s | categories=%s",
@@ -118,7 +142,6 @@ class RagPipeline:
             categories,
         )
 
-        # ---------------- RETRIEVAL ----------------
         retrieval_start_time = time.time()
 
         try:
@@ -152,7 +175,6 @@ class RagPipeline:
             time.time() - retrieval_start_time,
         )
 
-        # ❌ aucun document
         if not documents:
             logger.info(
                 "⏱ Total pipeline time: %.3f sec",
@@ -163,8 +185,7 @@ class RagPipeline:
                 intent=effective_intent,
             )
 
-        # ---------------- ANTI HALLUCINATION ----------------
-        best_distance = float(documents[0].get("adjusted_distance") or 999.0)
+        best_distance = self._get_document_distance(documents[0])
         threshold = self.settings.max_retrieval_distance
 
         logger.info("Distance=%.3f | threshold=%.2f", best_distance, threshold)
@@ -180,7 +201,6 @@ class RagPipeline:
                 intent=effective_intent,
             )
 
-        # ---------------- FAQ SHORTCUT ----------------
         if self._should_short_circuit_with_faq(documents):
             faq_answer = self._extract_faq_answer_from_content(
                 documents[0].get("content", "")
@@ -196,7 +216,6 @@ class RagPipeline:
                     intent=effective_intent,
                 )
 
-        # ---------------- GENERATION ----------------
         context_docs = documents[:5]
 
         prompt_start_time = time.time()
